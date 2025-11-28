@@ -7,12 +7,15 @@ from validate import validate_tool_call
 
 app = FastAPI()
 
+# template
 templates = Jinja2Templates(directory="templates")
 
+# ui routes
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.get_template("index.html").render({"request": request})
 
+# validate route
 @app.post("/validate")
 async def validate(json_input: str = Form(...)):
     try:

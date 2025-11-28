@@ -1,11 +1,10 @@
-# validate.py
 from typing import Any, Dict, List, Tuple
 
 def validate_tool_call(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], List[str]]:
     clean: Dict[str, Any] = {}
     errors: List[str] = []
 
-    # --- action ---
+    # action
     action_raw = payload.get("action")
     if not isinstance(action_raw, str):
         errors.append("Missing or invalid 'action' (must be string)")
@@ -16,7 +15,7 @@ def validate_tool_call(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], List[st
         return {}, errors
     clean["action"] = action
 
-    # --- q ---
+    # q
     if action == "search":
         q_raw = payload.get("q")
         if q_raw is None:
@@ -28,7 +27,7 @@ def validate_tool_call(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], List[st
             return {}, errors
         clean["q"] = q
 
-    # --- k: optional int in [1,5], default 3 (clean version) ---
+    # k
     k = 3
     if (k_raw := payload.get("k")) is not None:
         try:
@@ -42,7 +41,7 @@ def validate_tool_call(payload: Dict[str, Any]) -> Tuple[Dict[str, Any], List[st
             errors.append(f"Invalid 'k'={k_raw!r} → using default 3")
     clean["k"] = k
 
-    # --- remove unknown keys ---
+    # remove unknown keys
     for key in payload.keys():
         if key not in {"action", "q", "k"}:
             errors.append(f"Removed unknown key: {key!r}")
