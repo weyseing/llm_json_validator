@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Tool-Call Validator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    pre code { background: #f9fafb !important; }
+  </style>
+</head>
+<body class="bg-white min-h-screen">
+  <div class="max-w-7xl mx-auto px-6 py-12">
+
+    <header class="border-b border-gray-200 pb-8 mb-12">
+      <div class="text-center">
+        <h1 class="text-4xl font-bold text-gray-900 tracking-tight">
+          LLM Tool-Call Validator
+        </h1>
+        <p class="mt-3 text-lg text-gray-600">
+          Strict schema validation and coercion for untrusted LLM-generated JSON
+        </p>
+      </div>
+    </header>
+
+    <div class="grid lg:grid-cols-2 gap-12">
+
+      <section class="space-y-8">
+        <div class="bg-white border border-gray-300 rounded-lg shadow-sm">
+          <div class="border-b border-gray-200 bg-gray-50 px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900">Raw LLM Output</h2>
+          </div>
+          <div class="p-6">
+            <textarea id="input"
+              class="w-full h-96 font-mono text-sm bg-white border border-gray-300 rounded-md p-4 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent resize-none"
+              placeholder='Paste untrusted JSON here'>{"action": "search", "q": "  What is the capital of Germany?  ", "k": "10", "model": "gpt-4o", "temperature": 0.0}</textarea>
+          </div>
+        </div>
+
+        <button onclick="validate()"
+          class="w-full bg-blue-700 hover:bg-blue-800 text-white font-medium text-lg py-4 rounded-md transition-colors">
+          Validate & Coerce Payload
+        </button>
+      </section>
+
+      <section class="space-y-8">
+
+        <div class="bg-white border border-gray-300 rounded-lg shadow-sm overflow-hidden">
+          <div class="border-b border-gray-200 bg-gray-50 px-6 py-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Validated Output</h2>
+            <span id="status" class="text-sm font-medium px-3 py-1 rounded-full"></span>
+          </div>
+          <div class="p-6 bg-gray-50">
+            <pre class="rounded-md overflow-x-auto"><code id="clean" class="language-json text-sm"></code></pre>
+          </div>
+        </div>
+
+        <!-- Validation Report — now RED when errors -->
+        <div class="bg-white border border-gray-300 rounded-lg shadow-sm">
+          <div class="border-b border-gray-200 bg-gray-50 px-6 py-4">
+            <h2 class="text-lg font-semibold text-gray-900">Validation Report</h2>
+          </div>
+          <div class="p-6">
+            <pre id="errors" 
+                 class="text-sm font-medium min-h-48 rounded-md p-4 border 
+                        transition-all duration-200"></pre>
+          </div>
+        </div>
+
+      </section>
+    </div>
+
+    <footer class="mt-16 pt-8 border-t border-gray-200 text-center text-sm text-gray-500">
+      <p>Zero-trust validation • Type coercion • Range enforcement • Unknown key removal • Fatal rejection on schema violation</p>
+    </footer>
+  </div>
+
+<script>
+async function validate() {
+  const input = document.getElementById("input").value.trim();
+  const cleanEl = document.getElementById("clean");
+  const errorsEl = document.getElementById("errors");
+  const statusEl = document.getElementById("status");
+
+  // Reset
+  errorsEl.className = "text-sm font-medium min-h-48 rounded-md p-4 border transition-all duration-200";
+  errorsEl.classList.add("border-gray-200", "bg-gray-50", "text-gray-700");
+
+  if (!input) {
+    errorsEl.textContent = "Input is required.";
+    errorsEl.classList.add("border-red-300", "bg-red-50", "text-red-700");
+    cleanEl.textContent = "";
+    statusEl.textContent = "";
+    return;
+  }
+
+  try {
+    const resp = await fetch("/validate", {
+      method: "POST",
+      headers: {"Content-Type": "application/x-www-form-urlencoded"},
+      body: "json_input=" + encodeURIComponent(input)
+    });
+    const data = await resp.json();
+
+    if (data.clean) {
+      cleanEl.textContent = JSON.stringify(data.clean, null, 2);
+      statusEl.textContent = "VALID";
+      statusEl.className = "bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full";
+    } else {
+      cleanEl.textContent = "{}";
+      statusEl.textContent = "REJECTED";
+      statusEl.className = "bg-red-100 text-red-800 text-sm font-medium px-3 py-1 rounded-full";
+    }
+
+    if (data.error) {
+      errorsEl.textContent = "JSON Parse Error:\n" + data.error;
+      errorsEl.classList.add("border-red-300", "bg-red-50", "text-red-700");
+    } else if (data.errors && data.errors.length > 0) {
+      errorsEl.textContent = data.errors.map(e => "• " + e).join("\n");
+      errorsEl.classList.add("border-red-300", "bg-red-50", "text-red-700");
+    } else {
+      errorsEl.textContent = "No issues detected. Payload is fully compliant with schema.";
+      errorsEl.classList.add("border-green-300", "bg-green-50", "text-green-700");
+    }
+
+    hljs.highlightAll();
+  } catch (e) {
+    errorsEl.textContent = "Request failed: " + e.message;
+    errorsEl.classList.add("border-red-300", "bg-red-50", "text-red-700");
+  }
+}
+</script>
+</body>
+</html>
