@@ -1,6 +1,7 @@
 # Dockerfile
 FROM python:3.11-slim
 
+RUN mkdir -p /app
 WORKDIR /app
 
 COPY requirements.txt .
